@@ -1,9 +1,9 @@
 #!/bin/bash
 #BSUB -J ior-8
 #BSUB -n 8
-#BSUB -e ~/error.%J
-#BSUB -o ~/output.%J
-SOFTWARE_DIR=/shared/scratch
+#BSUB -e error.%J
+#BSUB -o output.%J
+SOFTWARE_DIR=/shared/tools
 export PATH=${SOFTWARE_DIR}/mpich3/bin:$PATH
 export LD_LIBRARY_PATH=${SOFTWARE_DIR}/mpich3/lib:${LD_LIBRARY_PATH}
 

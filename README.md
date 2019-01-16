@@ -33,7 +33,12 @@ This lab relies heavily on a bash environment and will be assuming availability 
 
 Use the `az` cli to create a resource group for this HOL in southeastasia and launch a container running CycleCloud:
 
+```bash
+    export ResourceGroup=hol-trial2
+    export InstanceName=hol-trial2
+    export InstanceDNS=hol-trial2    
     az group create -l southeastasia -n ${ResourceGroup}
+```
 
 Then launch Azure CycleCloud as a container instance in the resource group, more
 documentation is availabile in the CycleCloud [documentation](https://docs.microsoft.com/en-us/azure/cyclecloud/container-distribution):
@@ -46,7 +51,7 @@ This will take about 5 minutes for the container to come up, pull the image and 
 
 ## 2. Configure CycleCloud Admin User and Service Principal
 
-Now that you're able to access the CycleCloud UI, configure the admin user by following the docs:
+Now that you're able to access the CycleCloud UI, configure the initial user by following the docs:
 
 https://docs.microsoft.com/en-us/azure/cyclecloud/installation#configuration
 
@@ -59,65 +64,45 @@ Create the service principal in the cloud shell with the following command:
 
 More context can be found in the CycleCloud docs here: https://docs.microsoft.com/en-us/azure/cyclecloud/quickstart-install-cyclecloud#service-principal
 
+Continue the instructions to add the Service Principal to the CycleCloud installation.  
+The setup guide will provide a menu for adding the SP as a Cloud Provider Account.
+
+![CycleCloud configure Service Principal](images/cc-csp-configs.png)
+
 
 ## 3. Configuring CycleCloud using the CycleCloud CLI in the Cloud.Shell
 
-Adding new projects to CycleCloud and connecting to running clusters is done by using the command line tools. Each CycleCloud instance hosts the CLI tools in the web portal.  
+Adding new projects to CycleCloud and connecting to running clusters is done by using the command line tools. Each CycleCloud instance hosts the CLI tools in the web portal.  These steps needn't run in the Cloud.Shell
+but can run on any shell terminal.
 
 ```bash
 wget --no-check-certificate https://${InstanceDNS}.southeastasia.azurecontainer.io/download/tools/cyclecloud-cli.zip
 unzip cyclecloud-cli.zip
 cyclecloud-cli-installer/install.sh
-export PATH=$PATH:~/bin
+echo 'PATH=$PATH:~/bin' >> ~/.bashrc
+. ~/.bashrc
 cyclecloud
 ```
 
 These commands download, unzip, install and set required environment variable to use the cyclecloud cli.
-Configure the cli for access to CycleCloud and setup your account with the command line and your service principal details.
+Configure the cli for access to CycleCloud with the command line. 
 
 Here we use the same ResourceGroup as defined when creating the Azure Container Instance. 
 
 ```bash
-michael@Azure:~$ cyclecloud config create hol
-CycleServer URL: https://mikeholdemo-cc.southeastasia.azurecontainer.io
-Detected untrusted certificate.  Allow?: [no] yes
-/home/michael/.cycle/cli/local/lib/python2.7/site-packages/requests/packages/urllib3/connectionpool.py:734: InsecureRequestWarning: Unverified HTTPS request is being made. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.org/en/latest/security.html
-  InsecureRequestWarning)
-CycleServer username: [admin] admin
+cyclecloud config create hol-trial2
+Re-initializing. (Note: Current settings may be modified.)
+CycleServer URL: [http://localhost:8080] https://hol-trial2.southeastasia.azurecontainer.io
+Detected untrusted certificate.  Allow?: [yes] yes
+CycleServer username: [admin] mike
 CycleServer password:
-/home/michael/.cycle/cli/local/lib/python2.7/site-packages/requests/packages/urllib3/connectionpool.py:734: InsecureRequestWarning: Unverified HTTPS request is being made. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.org/en/latest/security.html
-  InsecureRequestWarning)
 
 Generating CycleServer key...
-First, we need a name for your cloud account. This can be anything that identifies the account (e.g., dev or prod).
-Note: this cannot be changed later.
-Account Name: azure
-Your Azure cloud environment
-Cloud Environment: public
-Your Azure tenant ID can be found when you run 'azure account list'.
-Tenant ID: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXX 
-Your Azure CycleCloud application ID from Azure portal. (Active Directory->App Registrations).
-Application ID: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXX
-The Azure CycleCloud application secret generated from Azure portal. (Active Directory->App Registrations)
-Application Secret:
-In order to administer the cloud account we need credentials to authenticate to Azure.
-Subscription ID: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXX
-Default data center location to use when not specified by a cluster.
-Default Location: southeastasia
-Azure default region has been set to southeastasia
-If specified, all Azure resources will be created in this resource group. Otherwise, a new resource group will be created per cluster
-Resource Group: mikeholdemo
-We need a place to store various data such as cluster coordination information.
-This storage account will be created for you if it does not already exist.
-Storage Account: mikeholdemostor
-This storage account does not exist yet.
-Create storage account? [n] y
-Finally, we need a container in the storage account to store various data.
-This storage container will be created for you if it does not already exist.
-Storage Container: [cyclecloud]
+Initial account already exists, skipping initial account creation.
+CycleCloud configuration stored in /home/michael/.cycle/config.ini
 ```
 
-The last step to setup your admin user is to provide CycleCloud with a public ssh key for the account.
+The last step to setup your user is to provide CycleCloud with a public ssh key for the account.
 
 If you don't already have an ssh key in your Cloud.Shell, create one with `ssh-keygen` and follow the instructions.  If you do, get the public key with `cat ~/.ssh/id_rsa.pub`.  
 
@@ -127,6 +112,8 @@ Copy the contents of the file and save them into your CycleCloud user profile.
  1. Select "My Profile" in the drop down.
  1. Select "Edit Profile" and paste the public key into the _SSH Public Key_ field.
 
+![CycleCloud add SSH public key](images/cc-profile.png)
+
 ## 4. Configure pogo to access the cyclecloud storage locker
 
 We will be uploading project data into the cyclecloud storage locker specific to this lab. So we need to configure access to the locker we created.  To get the locker details:
@@ -134,7 +121,7 @@ We will be uploading project data into the cyclecloud storage locker specific to
     $ cyclecloud locker list
     azure-storage (az://mikeholdemostor/cyclecloud)
 
-This command shows the shorthand of the storage locker.  To continue, get the access key to the storage locker in the portal, and run `pogo config`.
+This command shows the shorthand of the storage locker.  To continue, get the **access key to the storage locker in the portal**, and run `pogo config`.
 
 ```bash
 $ pogo config
@@ -142,14 +129,12 @@ Re-initializing. (Note: Current settings may be modified.)
 Would you like to add another pogo configuration section (y/n)? [n] y
 
 Please provide a name to refer to this set of options.
-Section Name: hol-demo
+Section Name: hol-trial2
 You may enter a url or urls which this section is to be limited to.  The list should be comma separated.
-URL(s): (optional) az://mikeholdemostor/cyclecloud
+URL(s): (optional) az://mikeseasia/cyclecloud
 Storage Account Access Key:
 ```
 When prompted provide the URL, and Access key, and don't enable additional encryption for simplicity.
-
-
 
 ## 5. Launch a BeeGFS cluster with the default settings.
 
@@ -161,7 +146,7 @@ We're going to use the default settings, all of which are chosen by default. One
 
 ![BeeGFS Select Subnet](images/beegfs-select-subnet.png)
 
-If there are no subnets in the dropdown, then create a vnet and subnet in the region using the azure portal or cli.  CycleCloud can take as long as 10 minutes to register new subnets in the UI.. if your new subnet isn't appearing in the dropdown, just wait a few minutes.
+If there are no subnets in the dropdown, then create a vnet and subnet in the region using the azure portal or cli.  **CycleCloud can take as long as 10 minutes to register new subnets in the UI..** if your new subnet isn't appearing in the dropdown, just wait a few minutes.
 
 ![BeeGFS Access Config](images/beegfs-access-controls.png)
 
@@ -183,9 +168,8 @@ Once the cluster is fully started, add a client node for interacting with the fi
 When the client node "turns green" and has entered the _started_ state, you can connect to it using the `cyclecloud connect` command.
 
 ```bash
-~$ export PATH=$PATH:~/bin
 ~$ cyclecloud connect client-1 -c beegfs1
-Connecting to admin@10.0.0.8 (instance ID: 59dcc214a941659ac8467d83e9e7c717) through SSH bastion at admin@13.76.192.51
+Connecting to mike@10.0.0.8 (instance ID: 59dcc214a941659ac8467d83e9e7c717) through SSH bastion at mike@13.76.192.51
 Warning: Permanently added '10.0.0.8' (ECDSA) to the list of known hosts.
 
  __        __  |    ___       __  |    __         __|
@@ -218,12 +202,17 @@ cluster in CycleCloud.
 1. Fetch the lsf installer and binaries using pogo.
 1. Upload the project to the CycleCloud Locker.
 
+These can all by done with the following commands run in the Cloud.Shell:
+
 ```bash
 git clone https://github.com/Azure/cyclecloud-lsf.git
-cd cyclecloud-lsf/blobs
+pushd cyclecloud-lsf/blobs
 pogo get az://requawestus2/public/lsf10.1_linux2.6-glibc2.3-x86_64.tar.Z
 pogo get az://requawestus2/public/lsf10.1_lsfinstall_linux_x86_64.tar.Z
-cyclecloud project upload my-locker
+cyclecloud locker list
+holtrial2-storage (az://mikeseasia/cyclecloud)
+cyclecloud project upload holtrial2-storage
+popd
 ```
 
 ---
@@ -243,9 +232,9 @@ tool.  There are two steps to add the project to CycleCloud.
 1. Change directory into the _io_project directory and upload.
 
 ```bash
-git clone <my-repo>
-cd projects/io
-cyclecloud project upload my-locker
+git clone https://github.com/mvrequa/HPC-HOL.git
+cd HPC-HOL/projects/io/
+cyclecloud project upload ${my-locker}
 ```
 
 ## 4. Configure and create LSF Cluster
@@ -309,17 +298,23 @@ sudo tail -f /opt/cycle/jetpack/logs/chef-client.log
 [2019-01-15T02:07:20+00:00] INFO:     0.503362 lsf::master
 ```
 
-You'll see the lsf, beegfs, and io software installations run. Note that the
-mpich and ior installer take some time to compile and build.
+You'll see the lsf, beegfs, and io software installations run. **Note that the
+mpich and ior installer take 20 minutes to compile and build.**
 
 ## 5. Run the IO Benchmark jobs
 
-As the admin user you can submit the io benchmark job.  Login to a master node
+As the initial user you can submit the io benchmark job.  Login to a master node
 and submit the job 2x.
 
 ```bash
-bsub < /shared/scratch/bench.sub
-bsub < /shared/scratch/bench.sub
+$ bsub < /shared/scratch/run_bench.sh
+Job <1> is submitted to default queue <normal>.
+$ bsub < /shared/scratch/run_bench.sh
+Job <2> is submitted to default queue <normal>.
+$ bjobs
+JOBID   USER    STAT  QUEUE      FROM_HOST   EXEC_HOST   JOB_NAME   SUBMIT_TIME
+1       mike    PEND  normal     ip-0a00000b             ior-8      Jan 16 22:39
+2       mike    PEND  normal     ip-0a00000b             ior-8      Jan 16 22:39
 ```
 
 ---
@@ -327,6 +322,40 @@ bsub < /shared/scratch/bench.sub
 
  Submit the same job twice! We need to trick the scheduler.
 
----
+Shortly after the jobs are submitted you can see that nodes are added to the 
+cluster in the UI.  These nodes are autoscaling as a result of the jobs in the queue.  
+When the nodes enter the _STARTED_ state then the cluster will add them and the jobs will run.
 
-Reading the job file, you can see the IO summary in the job output.
+![CycleCloud Autoscale](images/cc-scaleup.png)
+
+Explore _bqueues_, _bjobs_ and _bhosts_ from the command-line.  These are the LSF 
+commands for showing the status of the cluster.  By default, LSF identifies physical cores, rather than virtual cores as slots, so we need to submit two jobs to reach the correct scale.
+
+```bash
+$ bjobs
+JOBID   USER    STAT  QUEUE      FROM_HOST   EXEC_HOST   JOB_NAME   SUBMIT_TIME
+8       mike    RUN   normal     ip-0a00000b ip-0a00000d ior-8      Jan 16 22:55
+                                             ip-0a00000d
+                                             ip-0a00000d
+                                             ip-0a00000d
+                                             ip-0a00000c
+                                             ip-0a00000c
+                                             ip-0a00000c
+                                             ip-0a00000c
+``` 
+
+This job is doing filesystem operations on the beegfs cluster to measure IO performance. The output file will contain details of the IO benchmark. e.g.
+
+```bash
+Results:
+
+access    bw(MiB/s)  block(KiB) xfer(KiB)  open(s)    wr/rd(s)   close(s)   total(s)   iter
+------    ---------  ---------- ---------  --------   --------   --------   --------   ----
+Commencing write performance test: Wed Jan 16 22:55:34 2019
+write     44.78      1048576    4.00       0.007478   182.91     49.97      182.93     0
+Commencing read performance test: Wed Jan 16 22:58:37 2019
+read      52.90      1048576    4.00       0.013605   154.84     40.42      154.85     0
+remove    -          -          -          -          -          -          0.064914   0
+Max Write: 44.78 MiB/sec (46.96 MB/sec)
+Max Read:  52.90 MiB/sec (55.47 MB/sec)
+```
