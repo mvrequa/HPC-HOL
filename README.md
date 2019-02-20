@@ -206,6 +206,7 @@ These can all by done with the following commands run in the Cloud.Shell:
 
 ```bash
 git clone https://github.com/Azure/cyclecloud-lsf.git
+git checkout feature/rc
 pushd cyclecloud-lsf/blobs
 pogo get az://requawestus2/public/lsf10.1_linux2.6-glibc2.3-x86_64.tar.Z
 pogo get az://requawestus2/public/lsf10.1_lsfinstall_linux_x86_64.tar.Z
@@ -239,7 +240,7 @@ cyclecloud project upload ${my-locker}
 
 ## 4. Configure and create LSF Cluster
 
-The [lsf cluster template file](templates/lsf.txt) in this repo contains most of
+The [lsf cluster template file](templates/lsf-io.txt) in this repo contains most of
 the necessary configuration to run the IO benchmarking tools.  What's missing 
 are only details about the VNet being used.  These can be entered in the UI.
 
@@ -248,7 +249,7 @@ are only details about the VNet being used.  These can be entered in the UI.
 Import the lsf cluster template file into cyclecloud as a cluster template.
 
 ```bash
-cyclecloud import_cluster lsf-io -c lsf -f templates/lsf.txt -t
+cyclecloud import_cluster lsf-io -c lsf -f templates/lsf-io.txt -t
 ```
 
 Then we can make the final configurations in UI.  
