@@ -96,11 +96,12 @@
         InitialCount = $MasterNodeCountHA
         AdditionalClusterInitSpecs = $MasterClusterInitSpecs
 
-        [[[cluster-init cyclecloud/beegfs:default:1.0.0]]]
-        [[[cluster-init cyclecloud/beegfs:client:1.0.0]]]
+        [[[cluster-init cyclecloud/beegfs:default:$BeeGFSProjectVersion]]]
+        [[[cluster-init cyclecloud/beegfs:client:$BeeGFSProjectVersion]]]
+        [[[cluster-init lsf:master:$LsfProjectVersion]]]
 
         [[[configuration]]]
-        run_list = recipe[cyclecloud],recipe[cshared::client],recipe[cuser],recipe[cganglia::client],recipe[lsf::install],recipe[lsf::master],recipe[lsf::autoscale]
+        run_list = recipe[cyclecloud],recipe[cshared::client],recipe[cuser],recipe[cganglia::client],recipe[lsf::install],recipe[lsf::master]
         cshared.server.shared_dir = /shared
         cyclecloud.discoverable = true
 
@@ -143,12 +144,12 @@
         Interruptible = $UseLowPrio
 
         MaxCoreCount = $MaxExecuteCoreCount
-        [[[cluster-init lsf:notify:$LsfProjectVersion]]]
-        [[[cluster-init cyclecloud/beegfs:default:1.0.0]]]
-        [[[cluster-init cyclecloud/beegfs:client:1.0.0]]]
+        [[[cluster-init cyclecloud/beegfs:default:$BeeGFSProjectVersion]]]
+        [[[cluster-init cyclecloud/beegfs:client:$BeeGFSProjectVersion]]]
+        [[[cluster-init lsf:execute:$LsfProjectVersion]]]
 
         [[[configuration]]]
-        run_list = recipe[cyclecloud],recipe[cshared::client],recipe[cuser],recipe[cganglia::client],recipe[lsf::slave],recipe[lsf::autostop]
+        run_list = recipe[cyclecloud],recipe[cshared::client],recipe[cuser],recipe[cganglia::client],recipe[lsf::worker]
 
         [[[configuration cyclecloud.mounts.sched-exp]]]
         type = nfs
@@ -354,3 +355,11 @@ Order = 20
         Description = The mount point to mount the BeeGFS file server on.
         DefaultValue = /mnt/beegfs
         Required = True
+
+        [[[parameter BeeGFSProjectVersion]]]
+        Label = BeeGFS Project Version
+        Description = The mount point to mount the BeeGFS file server on.
+        DefaultValue = 1.0.1
+        Required = True
+
+

@@ -51,6 +51,14 @@ This will take about 5 minutes for the container to come up, pull the image and 
 
 ## 2. Configure CycleCloud Admin User and Service Principal
 
+If you don't already have an ssh key in your Cloud.Shell, create one with `ssh-keygen` and follow the instructions.  If you do, get the public key with `cat ~/.ssh/id_rsa.pub`.  
+
+During the initial CycleCloud setup add the default admin user to CycleCloud and
+provide this ssh public key for the user profile. This key will be used to gain
+access to CycleCloud clusters henceforth.
+
+![CycleCloud add SSH public key](images/cc-admin-user.png)
+
 Now that you're able to access the CycleCloud UI, configure the initial user by following the docs:
 
 https://docs.microsoft.com/en-us/azure/cyclecloud/installation#configuration
@@ -101,18 +109,6 @@ Generating CycleServer key...
 Initial account already exists, skipping initial account creation.
 CycleCloud configuration stored in /home/michael/.cycle/config.ini
 ```
-
-The last step to setup your user is to provide CycleCloud with a public ssh key for the account.
-
-If you don't already have an ssh key in your Cloud.Shell, create one with `ssh-keygen` and follow the instructions.  If you do, get the public key with `cat ~/.ssh/id_rsa.pub`.  
-
-Copy the contents of the file and save them into your CycleCloud user profile.
-
- 1. Click your username in the upper right hand corner.
- 1. Select "My Profile" in the drop down.
- 1. Select "Edit Profile" and paste the public key into the _SSH Public Key_ field.
-
-![CycleCloud add SSH public key](images/cc-profile.png)
 
 ## 4. Configure pogo to access the cyclecloud storage locker
 
@@ -206,7 +202,6 @@ These can all by done with the following commands run in the Cloud.Shell:
 
 ```bash
 git clone https://github.com/Azure/cyclecloud-lsf.git
-git checkout feature/rc
 pushd cyclecloud-lsf/blobs
 pogo get az://requawestus2/public/lsf10.1_linux2.6-glibc2.3-x86_64.tar.Z
 pogo get az://requawestus2/public/lsf10.1_lsfinstall_linux_x86_64.tar.Z
