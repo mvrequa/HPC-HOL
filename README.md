@@ -202,6 +202,7 @@ These can all by done with the following commands run in the Cloud.Shell:
 
 ```bash
 git clone https://github.com/Azure/cyclecloud-lsf.git
+git checkout feature/central-autoscale
 pushd cyclecloud-lsf/blobs
 pogo get az://requawestus2/public/lsf10.1_linux2.6-glibc2.3-x86_64.tar.Z
 pogo get az://requawestus2/public/lsf10.1_lsfinstall_linux_x86_64.tar.Z
