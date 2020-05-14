@@ -46,7 +46,7 @@ azcopy cp "./blobs/*" "https://$STORAGE_ACCOUNT.blob.core.windows.net/${BLOB}$SA
 Let's use the [fully-managed LSF template](https://github.com/Azure/cyclecloud-lsf/blob/master/examples/lsf-full.txt) 
 in cyclecloud-lsf as a starting point for the master node(s).
 All the changes we want are concerning NFS mounts. We want to move the LSF mount
-from the project fileserver to an Azure NetAPP filesystem.
+from the project fileserver to an Azure NetAPP Volume.
 In this lab we'll use two methods to accomplish the same thing.
 
 On the execute nodes we'll update _/etc/fstab_ to have this mount: 
@@ -55,20 +55,40 @@ On the execute nodes we'll update _/etc/fstab_ to have this mount:
 10.0.16.4:/main /stor nfs rw,hard,tcp,vers=3,rsize=65536,wsize=65536 0 0
 ```
 
-On the master nodes we'll update the cluster template to have an [NFS mount](https://docs.microsoft.com/azure/cyclecloud/how-to/mount-fileserver):
-```ini
-   [[[configuration cyclecloud.mounts.anf]]]
-      type = nfs
-      address = 10.0.16.4
-      mountpoint = /stor
-      export_path = /main
-```
-
+On the master nodes we'll update the cluster template to have an [NFS mount](https://docs.microsoft.com/azure/cyclecloud/how-to/mount-fileserver).
 Both methods are equivalent. The LSF template also has a hard reference to the shared filesystem host.
 We'll want to move the NFS filesystem mount away from _$LSF_TOP_ and to an alternate place on the filesystem.
 Where we see _sched-exp_ we'll change _$LSF_TOP_ to _/backup_. So _$LSF_TOP_ is now backed by the NetAPP filesystem and no longer the in-project filesystem.
+The diff of the example lsf cluster is shown below. A few lines replace the
+internally managed file system to 
 
 ```diff
+--- a/examples/lsf-full.txt
++++ b/examples/lsf-full.txt
+@@ -32,6 +32,12 @@
+
+         cyclecloud.selinux.policy = permissive
+
++       # CUSTOM SECTION FOR EDA-LAB, ANF
++        [[[configuration cyclecloud.mounts.anf]]]
++           type = nfs
++           address = 10.0.16.4
++           mountpoint = /stor
++           export_path = /main
+
+         [[[cluster-init cyclecloud/lsf:default:$LsfProjectVersion]]]
+
+@@ -104,7 +110,7 @@
+
+         [[[configuration cyclecloud.mounts.sched-exp]]]
+         type = nfs
+-        mountpoint = $LSF_TOP
++        mountpoint = /backup
+         export_path = /mnt/raid/lsf
+
+         [[[configuration cyclecloud.mounts.home]]]
+@@ -151,7 +157,7 @@
+
          [[[configuration cyclecloud.mounts.sched-exp]]]
          type = nfs
 -        mountpoint = $LSF_TOP
@@ -95,6 +115,10 @@ Allowing the LSF master cluster to start will set the baseline configuration for
 However, we want to treat the master node as a manually configured host and 
 configure LSF to work with a different CycleCloud cluster.
 
+To move LSF do a different filesystem, change the _LSF_TOP_ property in the 
+cluster menu to _/stor/lsf_. This location is defined with the template
+modifications to fall on ANF.
+
 ### Create a CycleCloud user for API access
 
 LSF must be provided API keys (username, password) to interact with CycleCloud. Create a basic
@@ -114,6 +138,7 @@ Use the UI to make the following customizations:
 
 * Grant the API user the "Manage this cluster" permission.
 * Add `cuser.base_home_dir = /shared/home` to the configuration section in each of the node arrays.
+* Change the _LSF_TOP_ property in the edit menu to _/stor/lsf_.
 
 Start the cluster and we're ready to integrate the master node with this new cluster.
 
@@ -149,11 +174,20 @@ Use the CycleCloud details, new LSF cluster name, API user details
 #### _cyclecloudprov_templates.json_
 
 [This file](https://www.ibm.com/support/knowledgecenter/SSWRJV_10.1.0/lsf_resource_connector/lsf_rc_azureccprovtemplates.html) 
-will already exist with boilerplate. Update the templates to use new *vmSize*; *Standard_F32s_v2* for the *ondemand* nodes and *Standard_Hc44rs* for the *ondemandmpi*
+will already exist with boilerplate. It's also available in the [github project](https://github.com/Azure/cyclecloud-lsf/blob/master/examples/cyclecloudprov_templates.json).
+ Update the templates to use new *vmSize*; *Standard_F32s_v2* for the *ondemand* nodes and *Standard_Hc44rs* for the *ondemandmpi*
 templates. **For LSF to properly autoscale, you must update the ncpus/ncores/mem values according to the new vmSize**, e.g. ncores=ncpus=44 for *Standard_Hc44rs*. 
 
 We'll be adding a new custom script in the next section. Add a reference to it in this file by
-setting _customScriptUri_ to _file:///stor/lsf/conf/resource_connector/cyclecloud/conf/user_data.sh_. This will use the user_data.sh script on the shared file system as a boot-up script.
+setting _customScriptUri_. 
+The URI should be a SAS-signed URL to a blob in the same storage account having the format below.
+
+```bash
+https://$STORAGE_ACCOUNT.blob.core.windows.net/cyclecloud/lsf/user_data.sh$SAS_TOKEN
+```
+
+This file has templates which already correspond to lsf queues so it leverages
+the extended LSF configuration that is part of the master node recipes in _lsf-full.txt_.
 
 #### _user_data.sh_
 
@@ -162,10 +196,56 @@ several configurations that we will add to support proper daemon configuration.
 The CycleCloud [LSF project example](https://github.com/Azure/cyclecloud-lsf/blob/master/examples/user_data.sh) is a good starting point. Once the updates are complete, this script 
 will serve to:
 
+* add the lsfadmin user 
 * mount the in-project (for _/shared/home_) and ANF (for _/stor_) filesystem
-* add the lsfadmin user
 * make a local copy of _lsf.conf_ and populate [_LSF_LOCAL_RESOURCES_](https://www.ibm.com/support/knowledgecenter/SSETD4_9.1.2/lsf_config_ref/lsf.conf.lsf_local_resources.5.html) for heterogeneous clusters
 * set _LSF_ENVDIR_ and start the daemons 
+
+The diff resulting of this file compared to the original example is here:
+
+```diff
+--- a/examples/user_data.sh
++++ b/examples/user_data.sh
+@@ -1,15 +1,34 @@
+ #!/bin/bash
+ set -x
+
+-LSF_TOP_LOCAL=/grid/lsf
+-LSF_CONF=$LSF_TOP_LOCAL/conf/lsf.conf
++if ! grep -q lsfadmin /etc/passwd ; then
++  useradd lsfadmin
++fi
++
++mkdir -p /stor
++
++if ! grep -q "10.0.0.6" /etc/fstab ; then
++  echo "10.0.0.6:/mnt/raid/home /shared/home nfs defaults,proto=tcp,nfsvers=3,rsize=65536,wsize=65536,noatime 0 0" >> /etc/fstab
++fi
++
++if ! grep -q "10.0.16.4" /etc/fstab ; then
++  echo "10.0.16.4:/main /stor nfs rw,hard,tcp,vers=3,rsize=65536,wsize=65536 0 0" >> /etc/fstab
++fi
++
++mount -a
++
++mkdir -p /etc/lsf
++cp /stor/lsf/conf/lsf.conf /etc/lsf/
++LSF_CONF=/etc/lsf/lsf.conf
++LSF_TOP_LOCAL=/stor/lsf
++
+
+
+@@ -58,7 +77,7 @@ if [ -n "${placement_group_id}" ]; then
+ fi
+
+ echo "LSF_LOCAL_RESOURCES=\"${TEMP_LOCAL_RESOURCES}\"" >> $LSF_CONF
+-
++export LSF_ENVDIR=/etc/lsf
+
+ lsadmin limstartup
+ lsadmin resstartup
+ badmin hstartup
+```
 
 ### Submit test jobs
 
@@ -173,6 +253,11 @@ The LSF RC configuration is complete and the LSF master node is ready to dynamic
 
 ```bash 
 bsub /bin/sleep 60
+bsub -q ondemandmpi /bin/sleep 60
 ```
 
+These two jobs will run on different nodes. One node will be _Standard_F32s_v2_ and the other will be _Standard_H44rs_, demonstrating
+the heterogeneous node capability of this solution. 
+You can now continue to tune an stratify your cluster based on matching
+job requirements with VM resources.
 
