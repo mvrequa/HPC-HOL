@@ -6,11 +6,16 @@ for automation.
 
 This project assumes several prerequisites are setup, configured and running.
 
-Pre-requisites
+Cluster Pre-requisites
 * LSF Installer and License Files
 * Virtual Network
 * Azure NetAPP Files Volume
 * CycleCloud
+
+Application pre-requisites
+* Cadence Xcelium Licenses and Running License Server
+* Cadence download username and password
+* InstallScape installer
 
 ## Setup the master node(s)
 
@@ -260,4 +265,109 @@ These two jobs will run on different nodes. One node will be _Standard_F32s_v2_ 
 the heterogeneous node capability of this solution. 
 You can now continue to tune an stratify your cluster based on matching
 job requirements with VM resources.
+
+## Setup the EDA workflow
+
+Xcelium is a licensed simulator for design verification. When you setup this lab,
+realize that you must bring-your-own license. This will be set as a license server
+environment variable during runtime.
+
+Pre-requisites
+* Test case in object store
+* Shared access token for storage account
+* License server access
+* Cadence download credentials
+
+### Install Xcelium to NetApp Volume
+
+This lab makes use of Xcelium by Cadence. To install we'll use the Cadence InstallScape 
+tool chain. Use the following script to install Xcelium - it can take 20 min for this
+to run as it downloads installers and artifacts for the Xcelium software. 
+
+
+```bash
+#!/bin/bash
+
+LOCAL_SSD=/mnt/resource
+INST_DIR=/stor/apps
+
+mkdir -p $INST_DIR
+chmod 777 $INST_DIR
+cd $INST_DIR
+
+azcopy cp "https://$STORAGE_ACCOUNT.blob.core.windows.net/${BLOB}${SAS_TOKEN}" .
+
+tar -xf IScape04.23-s012lnx86.t.Z -C $INST_DIR
+
+yum -y install java-1.8.0-openjdk
+yum -y install redhat-lsb.i686
+
+#http://sw.cadence.com/is/XCELIUM1809/lnx86/Hotfix_XCELIUMMAIN18.09.011
+
+cat <<EOF > xcelium_ctl.txt
+sourceLocation=http://sw.cadence.com/is/XCELIUM1809/lnx86/Base
+minorAction=Install
+MajorAction=Download
+installDirectory=$INST_DIR/cadence
+archiveDirectory=$LOCAL_SSD/archive
+cacheDirectory=$LOCAL_SSD/cache
+saveCadenceUserNameAndPassword=true
+EOF
+
+$INST_DIR/iscape.04.23-s012/bin/iscape.sh  -batch optionsFile=$(pwd)/xcelium_ctl.txt
+```
+### Change to a smaller VM configuration
+
+We'll run the Xcelium jobs on a smaller VM, _Standard_F2s_v2_ instead
+of _Standard_F32s_v2_. So make sure to add the smaller VM to the list
+of VM sizes in the UI and update _cyclecloudprov_templates.json_.
+
+
+### Update cluster for Xcelium requirements
+
+The Xcelium binaries are installed on NFS but the run time requires OS packages to be installed.
+Let's add these packages to the user_data.sh script to prepare the hosts as they come up.
+
+We'll add the following line to user_data.sh and upload the script to the storage account.
+
+```bash
+yum install -y redhat-lsb.i686 glibc-devel.i686
+```
+
+We're also going to pull down the simulation projects as part of the job script. We'll
+need `azcopy` to be available on all the hosts, so let's add it to the user home directory.
+
+```bash
+wget https://aka.ms/downloadazcopy-v10-linux
+tar -xf downloadazcopy-v10-linux
+mkdir ~/bin
+mv azcopy_linux_*/azcopy ~/bin
+```
+
+
+### Prepare job script
+
+
+
+```bash
+#!/bin/bash
+set -x
+export LM_LICENSE_FILE=5280@$LICENSE_SERVER
+
+EXP=`uuidgen`
+mkdir ~/$EXP
+cd ~/$EXP
+
+# Copy the project
+BLOB=cyclecloud/test_case.tar.gz
+~/bin/azcopy cp "https://$STORAGE_ACCOUNT.blob.core.windows.net/$BLOB$SAS_TOKEN" ./
+tar -xf test_case.tar.gz
+
+# Run the test
+pushd uvm_test_long/lab03_test/sv
+sed -i 's/100000/1000000/' yapp_tx_seqs.sv
+popd
+cd uvm_test_long/lab03_test/tb
+time /stor/apps/cadence/tools.lnx86/bin/xrun -f lab03run.f
+```
 
